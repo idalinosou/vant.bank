@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>vant.bank — contas, transferências e extrato</title>
+  <meta name="description" content="Banco digital da suíte vant: contas com saldo e limite, depósitos, saques, transferências com histórico e extrato paginado. API em Spring Boot." />
+  <meta name="theme-color" content="#070d12" />
+  <link rel="icon" href="marca/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="icon" href="marca/favicon-64.png" sizes="64x64" type="image/png" />
+  <link rel="apple-touch-icon" href="marca/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=3" />
+</head>
+<body>
+  <a class="pular" href="#conteudo">Ir para o conteúdo</a>
+
+  <header class="topo">
+    <div class="topo-linha">
+      <a class="marca" href="https://idalinosou.github.io/portfolio/" title="Voltar ao portfólio">
+        <img class="marca-logo" src="marca/vant-mark.png" alt="" width="807" height="592" />
+        <span>vant<span class="marca-ponto">.</span>bank</span>
+      </a>
+
+      <nav class="nav" aria-label="Seções do banco">
+        <button type="button" class="nav-link ativo" data-vista="painel">Painel</button>
+        <button type="button" class="nav-link" data-vista="contas">Contas</button>
+        <button type="button" class="nav-link" data-vista="transferir">Transferir</button>
+        <button type="button" class="nav-link" data-vista="extrato">Extrato</button>
+      </nav>
+
+      <div class="topo-acoes">
+        <span id="selo-modo" class="selo">Carregando…</span>
+        <button type="button" class="botao-secundario" id="atualizar-tudo">Atualizar</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo" class="conteudo">
+    <p class="aviso" id="aviso-geral" role="status" aria-live="polite"></p>
+
+    <!-- Painel -->
+    <section class="vista" id="vista-painel">
+      <div class="abertura">
+        <p class="rotulo">Banco digital · Spring Boot</p>
+        <h1>Seu dinheiro, no controle.</h1>
+        <p class="subtitulo">
+          Contas com saldo e limite, depósitos, saques e transferências registrados
+          no extrato. Tudo validado pela API antes de mover um centavo.
+        </p>
+      </div>
+
+      <div class="destaques" id="cartoes-painel">
+        <article class="destaque destaque-saldo">
+          <small>Saldo total</small>
+          <strong id="cartao-saldo">R$ 0,00</strong>
+          <span>Somando as contas abertas</span>
+        </article>
+        <article class="destaque">
+          <small>Contas ativas</small>
+          <strong id="cartao-ativas">0</strong>
+          <span>Prontas para movimentar</span>
+        </article>
+        <article class="destaque alerta">
+          <small>Bloqueadas</small>
+          <strong id="cartao-bloqueadas">0</strong>
+          <span>Movimentações suspensas</span>
+        </article>
+        <article class="destaque">
+          <small>Volume no mês</small>
+          <strong id="cartao-volume">R$ 0,00</strong>
+          <span>Entradas e saídas do mês</span>
+        </article>
+        <article class="destaque">
+          <small>Transferências no mês</small>
+          <strong id="cartao-transferencias">0</strong>
+          <span>Operações entre contas</span>
+        </article>
+      </div>
+
+      <div class="grade-painel">
+        <section class="painel">
+          <div class="painel-topo">
+            <div>
+              <h2>Últimas movimentações</h2>
+              <p class="painel-sub">O que passou pelo caixa recentemente</p>
+            </div>
+            <button type="button" class="link-acao" data-ir="contas">Ver contas →</button>
+          </div>
+          <div class="tabela-rolagem">
+            <table class="tabela">
+              <thead>
+                <tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Valor</th></tr>
+              </thead>
+              <tbody id="corpo-ultimas">
+                <tr><td colspan="4" class="vazio">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="painel">
+          <h2>Carteira</h2>
+          <ul class="recursos">
+            <li><span>Contas</span><b id="recurso-total">0</b></li>
+            <li><span>Ativas</span><b id="recurso-ativas">0</b></li>
+            <li><span>Bloqueadas</span><b id="recurso-bloqueadas">0</b></li>
+            <li><span>Encerradas</span><b id="recurso-encerradas">0</b></li>
+          </ul>
+          <div class="alerta-operacao" id="alerta-bloqueadas" hidden>
+            <strong>Atenção na carteira</strong>
+            <p id="texto-bloqueadas">Existem contas bloqueadas que não podem movimentar.</p>
+            <button type="button" class="botao-secundario" data-ir="contas">Revisar contas</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Contas -->
+    <section class="vista" id="vista-contas" hidden>
+      <div class="abertura compacta">
+        <p class="rotulo">Carteira</p>
+        <h1>Contas</h1>
+        <p class="subtitulo">Cadastre titulares, acompanhe saldos e libere ou bloqueie movimentações.</p>
+      </div>
+
+      <div class="filtros" aria-label="Filtros de contas">
+        <div class="chips" id="chips-status" role="group" aria-label="Filtrar por status"></div>
+        <div class="filtros-linha">
+          <label class="busca">
+            <span class="oculto">Buscar conta</span>
+            <input type="search" id="busca-contas" placeholder="Buscar por número, titular ou documento…" autocomplete="off" />
+          </label>
+          <button type="button" class="botao-principal" id="botao-nova-conta">Nova conta</button>
+        </div>
+      </div>
+
+      <section class="painel" id="painel-form-conta" hidden>
+        <div class="painel-topo">
+          <h2 id="titulo-form-conta">Nova conta</h2>
+          <button type="button" class="link-acao" id="fechar-form-conta">Fechar</button>
+        </div>
+        <form class="formulario" id="form-conta" novalidate>
+          <div class="form-grade">
+            <label>Número <input type="text" id="conta-numero" placeholder="1007-7" maxlength="20" required /></label>
+            <label>Titular <input type="text" id="conta-titular" placeholder="Nome completo" maxlength="140" required /></label>
+            <label>Documento <input type="text" id="conta-documento" placeholder="000.000.000-00" maxlength="30" /></label>
+            <label>Tipo
+              <select id="conta-tipo">
+                <option value="CORRENTE">Corrente</option>
+                <option value="POUPANCA">Poupança</option>
+              </select>
+            </label>
+            <label>Limite <input type="text" id="conta-limite" placeholder="0,00" inputmode="decimal" /></label>
+          </div>
+          <div class="form-acoes">
+            <button type="submit" class="botao-principal" id="salvar-conta">Cadastrar conta</button>
+            <button type="button" class="botao-secundario" id="cancelar-conta" hidden>Cancelar edição</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="painel" id="painel-movimento" hidden>
+        <div class="painel-topo">
+          <div>
+            <h2 id="titulo-movimento">Movimentar conta</h2>
+            <p class="painel-sub">Depósito entra no saldo; saque desconta saldo e limite.</p>
+          </div>
+          <button type="button" class="link-acao" id="fechar-movimento">Fechar</button>
+        </div>
+        <form class="formulario" id="form-movimento" novalidate>
+          <div class="form-grade">
+            <label>Operação
+              <select id="movimento-tipo">
+                <option value="DEPOSITO">Depósito</option>
+                <option value="SAQUE">Saque</option>
+              </select>
+            </label>
+            <label>Valor <input type="text" id="movimento-valor" placeholder="0,00" inputmode="decimal" /></label>
+            <label>Descrição <input type="text" id="movimento-descricao" placeholder="Opcional" maxlength="160" /></label>
+          </div>
+          <div class="form-acoes">
+            <button type="submit" class="botao-principal" id="salvar-movimento">Confirmar</button>
+            <button type="button" class="botao-secundario" id="cancelar-movimento">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
+      <p class="aviso" id="aviso-contas" role="status" aria-live="polite"></p>
+
+      <section class="painel">
+        <div class="painel-topo">
+          <div>
+            <h2>Contas cadastradas</h2>
+            <p class="painel-sub" id="contagem-contas">0 registros</p>
+          </div>
+        </div>
+        <div class="tabela-rolagem">
+          <table class="tabela tabela-contas">
+            <thead>
+              <tr>
+                <th>Conta</th><th>Titular</th><th>Tipo</th><th>Saldo</th>
+                <th>Limite</th><th>Status</th><th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="corpo-contas">
+              <tr><td colspan="7" class="vazio">Carregando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <nav class="paginacao" id="paginacao-contas" aria-label="Paginação de contas"></nav>
+      </section>
+    </section>
+
+    <!-- Transferir -->
+    <section class="vista" id="vista-transferir" hidden>
+      <div class="abertura compacta">
+        <p class="rotulo">Operação</p>
+        <h1>Transferir</h1>
+        <p class="subtitulo">Mova dinheiro entre contas ativas com débito e crédito registrados no mesmo instante.</p>
+      </div>
+
+      <div class="grade-transferencia">
+        <section class="painel">
+          <h2>Nova transferência</h2>
+          <form class="formulario" id="form-transferencia" novalidate>
+            <div class="form-grade duas-colunas">
+              <label>Conta de origem
+                <select id="transferencia-origem">
+                  <option value="">Selecione…</option>
+                </select>
+              </label>
+              <label>Conta de destino
+                <select id="transferencia-destino">
+                  <option value="">Selecione…</option>
+                </select>
+              </label>
+              <label>Valor <input type="text" id="transferencia-valor" placeholder="0,00" inputmode="decimal" /></label>
+              <label>Descrição <input type="text" id="transferencia-descricao" placeholder="Opcional" maxlength="160" /></label>
+            </div>
+            <p class="dica" id="dica-transferencia">O saldo disponível inclui o limite da conta.</p>
+            <div class="form-acoes">
+              <button type="submit" class="botao-principal" id="salvar-transferencia">Transferir</button>
+            </div>
+          </form>
+
+          <div class="recibo" id="recibo-transferencia" hidden>
+            <span class="recibo-selo">Concluída</span>
+            <h3 id="recibo-titulo">Transferência realizada</h3>
+            <p id="recibo-detalhe"></p>
+            <ul class="recursos">
+              <li><span>Saldo da origem</span><b id="recibo-saldo-origem">R$ 0,00</b></li>
+              <li><span>Saldo do destino</span><b id="recibo-saldo-destino">R$ 0,00</b></li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="painel">
+          <div class="painel-topo">
+            <div>
+              <h2>Transferências recentes</h2>
+              <p class="painel-sub">Últimas saídas entre contas</p>
+            </div>
+          </div>
+          <div class="tabela-rolagem">
+            <table class="tabela">
+              <thead>
+                <tr><th>Data</th><th>Origem</th><th>Destino</th><th>Valor</th></tr>
+              </thead>
+              <tbody id="corpo-transferencias">
+                <tr><td colspan="4" class="vazio">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Extrato -->
+    <section class="vista" id="vista-extrato" hidden>
+      <div class="abertura compacta">
+        <p class="rotulo">Histórico</p>
+        <h1>Extrato</h1>
+        <p class="subtitulo">Cada entrada e saída da conta, com saldo após a operação.</p>
+      </div>
+
+      <section class="painel">
+        <div class="painel-topo">
+          <div>
+            <h2 id="extrato-titulo">Selecione uma conta</h2>
+            <p class="painel-sub" id="extrato-subtitulo">Escolha a conta para consultar o extrato.</p>
+          </div>
+          <label class="seletor-conta">
+            <span class="oculto">Conta do extrato</span>
+            <select id="extrato-conta"></select>
+          </label>
+        </div>
+
+        <div class="resumo-extrato" id="resumo-extrato" hidden>
+          <div>
+            <small>Saldo atual</small>
+            <strong id="extrato-saldo">R$ 0,00</strong>
+          </div>
+          <div>
+            <small>Limite</small>
+            <strong id="extrato-limite">R$ 0,00</strong>
+          </div>
+          <div>
+            <small>Status</small>
+            <span id="extrato-status" class="status-pill">—</span>
+          </div>
+        </div>
+
+        <div class="chips" id="chips-extrato" role="group" aria-label="Filtrar extrato"></div>
+
+        <div class="tabela-rolagem">
+          <table class="tabela">
+            <thead>
+              <tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Contraparte</th><th>Valor</th><th>Saldo após</th></tr>
+            </thead>
+            <tbody id="corpo-extrato">
+              <tr><td colspan="6" class="vazio">Selecione uma conta.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <nav class="paginacao" id="paginacao-extrato" aria-label="Paginação do extrato"></nav>
+      </section>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <p>vant.bank · parte da suíte <strong>vant.</strong> · operação de demonstração</p>
+    <a href="https://idalinosou.github.io/portfolio/">Voltar ao portfólio</a>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-texto"></span>
+  </div>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>
